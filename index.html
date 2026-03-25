@@ -26,6 +26,7 @@
     <style>
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
         * { -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -85,11 +86,16 @@
 
             <div class="flex flex-col gap-2">
                 <label class="text-xs font-semibold text-slate-400 px-1 uppercase tracking-wider">Stimme</label>
-                <div class="relative">
-                    <select id="voiceSelect" onchange="saveCurrentSettings()" class="w-full p-3.5 rounded-xl border border-slate-700 bg-slate-800 focus:border-pastel-purple focus:ring-1 focus:ring-pastel-purple transition-all appearance-none text-white shadow-sm">
-                        <!-- Wird via JS gefüllt -->
-                    </select>
-                    <i data-lucide="chevron-down" class="absolute right-4 top-1/2 -translate-y-1/2 text-pastel-purple w-5 h-5 pointer-events-none"></i>
+                <div class="flex gap-2">
+                    <div class="relative flex-grow">
+                        <select id="voiceSelect" onchange="saveCurrentSettings()" class="w-full p-3.5 rounded-xl border border-slate-700 bg-slate-800 focus:border-pastel-purple focus:ring-1 focus:ring-pastel-purple transition-all appearance-none text-white shadow-sm">
+                            <!-- Wird via JS gefüllt -->
+                        </select>
+                        <i data-lucide="chevron-down" class="absolute right-4 top-1/2 -translate-y-1/2 text-pastel-purple w-5 h-5 pointer-events-none"></i>
+                    </div>
+                    <button onclick="playVoicePreview()" id="previewBtn" class="p-3.5 bg-slate-800 border border-slate-700 hover:border-pastel-purple rounded-xl text-pastel-purple transition-all shadow-sm flex items-center justify-center min-w-[52px]" title="Stimme probehören">
+                        <i data-lucide="volume-2" id="previewIcon" class="w-5 h-5"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -138,12 +144,19 @@
         </div>
 
         <!-- Action Button -->
-        <button id="generateBtn" onclick="handleGenerateClick()" 
-            class="w-full bg-pastel-purple hover:bg-pastel-purple/90 active:scale-[0.98] text-slate-900 font-bold py-4 rounded-2xl shadow-lg shadow-pastel-purple/20 transition-all flex items-center justify-center gap-3 text-lg mt-2">
-            <i data-lucide="play" class="w-6 h-6 fill-slate-900"></i>
-            <span id="btnText">Audio Generieren</span>
-            <i data-lucide="loader-2" id="loadingIcon" class="w-6 h-6 animate-spin hidden"></i>
-        </button>
+        <div class="relative mt-2">
+            <button id="generateBtn" onclick="handleGenerateClick()" 
+                class="w-full bg-pastel-purple hover:bg-pastel-purple/90 active:scale-[0.98] text-slate-900 font-bold py-4 rounded-2xl shadow-lg shadow-pastel-purple/20 transition-all flex items-center justify-center gap-3 text-lg">
+                <i data-lucide="play" class="w-6 h-6 fill-slate-900"></i>
+                <span id="btnText">Audio Generieren</span>
+                <i data-lucide="loader-2" id="loadingIcon" class="w-6 h-6 animate-spin hidden"></i>
+            </button>
+            
+            <!-- Indeterminate Progress Bar -->
+            <div id="progressContainer" class="hidden absolute -bottom-4 left-4 right-4 h-1.5 bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                <div class="h-full bg-pastel-purple w-1/3 rounded-full animate-[slide_1.5s_ease-in-out_infinite]"></div>
+            </div>
+        </div>
 
         <!-- Audio Player Container -->
         <div id="audioContainer" class="hidden flex-col gap-3 mt-2 p-5 bg-slate-800/80 backdrop-blur border border-slate-700/50 rounded-2xl shadow-lg fade-in">
@@ -252,6 +265,11 @@
         const speedSlider = document.getElementById('speedSlider');
         const speedValue = document.getElementById('speedValue');
         const autoPlayToggle = document.getElementById('autoPlayToggle');
+        const progressContainer = document.getElementById('progressContainer');
+
+        // Cache für die Vorschau-Audios (Gedächtnis-Rucksack)
+        const previewCache = {};
+        const previewAudio = new Audio();
 
         // --- Setup UI Status ---
 
@@ -391,6 +409,91 @@
 
         // --- Hauptlogik API Aufrufe ---
 
+        async function playVoicePreview() {
+            const voice = voiceSelect.value;
+            const key = apiKeyInput.value.trim();
+            const model = modelSelect.value;
+            const previewBtn = document.getElementById('previewBtn');
+            const previewIcon = document.getElementById('previewIcon');
+
+            if (!key) {
+                showError("Für die Vorschau brauche ich zuerst deinen API Key.");
+                return;
+            }
+
+            hideError();
+            
+            // Haupt-Audio anhalten, falls etwas spielt
+            audioPlayer.pause();
+            
+            // UI Feedback laden
+            previewBtn.classList.add('opacity-50', 'pointer-events-none');
+            previewIcon.setAttribute('data-lucide', 'loader-2');
+            previewIcon.classList.add('animate-spin');
+            lucide.createIcons();
+
+            try {
+                // Check im Gedächtnis-Rucksack
+                if (previewCache[voice]) {
+                    previewAudio.src = previewCache[voice];
+                    await previewAudio.play();
+                    return; 
+                }
+
+                // Namen hübsch extrahieren für den kurzen Satz
+                const voicesList = apiConfig[currentProvider].voices;
+                const voiceObj = voicesList.find(v => v.id === voice);
+                const voiceName = voiceObj ? voiceObj.desc.split(' ')[0] : voice;
+                const previewText = `Hallo, ich bin ${voiceName}.`;
+
+                let finalAudioBlob = null;
+
+                // API Aufrufe analog zur Hauptfunktion
+                if (currentProvider === 'openai') {
+                    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ model: model, input: previewText, voice: voice })
+                    });
+                    if (!response.ok) throw new Error("Vorschau-Fehler bei OpenAI");
+                    finalAudioBlob = await response.blob();
+                } else if (currentProvider === 'gemini') {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: previewText }] }],
+                            generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } }
+                        })
+                    });
+                    if (!response.ok) throw new Error("Vorschau-Fehler bei Gemini");
+                    const result = await response.json();
+                    const inlineData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+                    const pcmData = base64ToInt16Array(inlineData.data);
+                    let sampleRate = 24000;
+                    const mimeMatch = inlineData.mimeType.match(/rate=(\d+)/);
+                    if (mimeMatch && mimeMatch[1]) sampleRate = parseInt(mimeMatch[1], 10);
+                    finalAudioBlob = createWavFile(pcmData, sampleRate);
+                }
+
+                const url = URL.createObjectURL(finalAudioBlob);
+                previewCache[voice] = url; // Im Rucksack ablegen
+                previewAudio.src = url;
+                await previewAudio.play();
+
+            } catch (error) {
+                console.error(error);
+                showError("Vorschau konnte leider nicht geladen werden.");
+            } finally {
+                // UI wiederherstellen
+                previewBtn.classList.remove('opacity-50', 'pointer-events-none');
+                previewIcon.setAttribute('data-lucide', 'volume-2');
+                previewIcon.classList.remove('animate-spin');
+                lucide.createIcons();
+            }
+        }
+
         async function handleGenerateClick() {
             const key = apiKeyInput.value.trim();
             const text = textInput.value.trim();
@@ -504,11 +607,13 @@
                 generateBtn.classList.add('opacity-80', 'cursor-not-allowed', 'scale-[0.98]');
                 btnText.textContent = "Verarbeite...";
                 loadingIcon.classList.remove('hidden');
+                progressContainer.classList.remove('hidden');
                 lucide.createIcons();
             } else {
                 generateBtn.classList.remove('opacity-80', 'cursor-not-allowed', 'scale-[0.98]');
                 btnText.textContent = "Audio Generieren";
                 loadingIcon.classList.add('hidden');
+                progressContainer.classList.add('hidden');
             }
         }
 
