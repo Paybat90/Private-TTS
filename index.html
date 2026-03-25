@@ -2,7 +2,6 @@
 <html lang="de" class="dark">
 <head>
     <meta charset="UTF-8">
-    <!-- Wichtig für mobile Stabilität: Verhindert Auto-Zoom bei Eingabefeldern -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mobile KI Stimme</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,11 +12,11 @@
             theme: {
                 extend: {
                     colors: {
-                        // Unsere Pastell-Akzente im Dark Mode
                         pastel: {
-                            purple: '#c4b5fd', // violet-300
-                            pink: '#f9a8d4',   // pink-300
-                            green: '#86efac',  // green-300
+                            purple: '#c4b5fd',
+                            pink: '#f9a8d4',
+                            green: '#86efac',
+                            blue: '#93c5fd'
                         }
                     }
                 }
@@ -27,15 +26,10 @@
     <style>
         .fade-in { animation: fadeIn 0.4s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        
         * { -webkit-tap-highlight-color: transparent; }
-        
-        /* Custom Scrollbar für die Textarea im Dark Mode */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-        
-        /* Verhindert iOS Zoom bei Inputs */
         input, select, textarea { font-size: 16px !important; }
     </style>
 </head>
@@ -48,7 +42,7 @@
             Vorleser KI
         </h1>
         <div class="w-9 h-9 rounded-full bg-slate-700/50 border border-pastel-purple/30 flex items-center justify-center text-pastel-purple shadow-inner">
-            <i data-lucide="settings-2" class="w-5 h-5"></i>
+            <i data-lucide="mic-2" class="w-5 h-5"></i>
         </div>
     </header>
 
@@ -100,12 +94,47 @@
             </div>
         </div>
 
+        <!-- NEW: Erweiterte Einstellungen (Speed & Autoplay) -->
+        <div class="flex flex-col gap-3 bg-slate-800/40 border border-slate-700/50 rounded-2xl p-4 shadow-sm">
+            <div class="flex items-center gap-2 mb-1">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4 text-pastel-green"></i>
+                <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Erweiterte Optionen</h3>
+            </div>
+            
+            <!-- Speed Slider -->
+            <div class="flex flex-col gap-3 mt-1">
+                <div class="flex justify-between items-center px-1">
+                    <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sprechgeschwindigkeit</label>
+                    <span id="speedValue" class="text-xs text-pastel-green font-mono font-bold bg-pastel-green/10 px-2 py-0.5 rounded-md">1.0x</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeedLabel(); saveCurrentSettings()" 
+                    class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-pastel-green">
+            </div>
+
+            <!-- Autoplay Toggle -->
+            <div class="flex items-center justify-between px-1 mt-4">
+                <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Automatisch abspielen</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="autoPlayToggle" onchange="saveCurrentSettings()" class="sr-only peer">
+                    <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pastel-green"></div>
+                </label>
+            </div>
+        </div>
+
         <!-- Input Area -->
-        <div class="flex flex-col gap-2">
-            <label for="textInput" class="text-xs font-semibold text-slate-400 px-1 uppercase tracking-wider">Dein Text</label>
-            <textarea id="textInput" rows="5" 
-                class="w-full p-4 rounded-2xl border border-slate-700 bg-slate-800 focus:border-pastel-purple focus:ring-1 focus:ring-pastel-purple transition-all resize-none shadow-sm text-white placeholder-slate-500 leading-relaxed"
-                placeholder="Was darf ich dir heute vorlesen?"></textarea>
+        <div class="flex flex-col gap-2 relative">
+            <div class="flex justify-between items-center px-1">
+                <label for="textInput" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Dein Text</label>
+                <span id="charCount" class="text-xs font-mono text-slate-500">0 Zeichen</span>
+            </div>
+            <div class="relative">
+                <textarea id="textInput" rows="5" oninput="updateCharCount()"
+                    class="w-full p-4 pb-10 rounded-2xl border border-slate-700 bg-slate-800 focus:border-pastel-purple focus:ring-1 focus:ring-pastel-purple transition-all resize-none shadow-sm text-white placeholder-slate-500 leading-relaxed"
+                    placeholder="Was darf ich dir heute vorlesen?"></textarea>
+                <button onclick="clearText()" class="absolute bottom-3 right-3 text-slate-400 hover:text-pastel-pink transition-colors p-1" title="Text löschen">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </button>
+            </div>
         </div>
 
         <!-- Action Button -->
@@ -118,10 +147,16 @@
 
         <!-- Audio Player Container -->
         <div id="audioContainer" class="hidden flex-col gap-3 mt-2 p-5 bg-slate-800/80 backdrop-blur border border-slate-700/50 rounded-2xl shadow-lg fade-in">
-            <p class="text-sm font-medium text-pastel-green flex items-center gap-2">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-                Aufnahme bereit
-            </p>
+            <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-pastel-green flex items-center gap-2">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                    Aufnahme bereit
+                </p>
+                <a id="downloadBtn" href="#" download="ki-stimme.wav" class="text-pastel-blue hover:text-white transition-colors flex items-center gap-1.5 text-xs font-semibold bg-pastel-blue/10 px-3 py-1.5 rounded-lg">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Speichern
+                </a>
+            </div>
             <audio id="audioPlayer" controls class="w-full h-12 rounded-lg grayscale invert opacity-90"></audio>
         </div>
         
@@ -145,12 +180,12 @@
                     { id: 'tts-1-hd', name: 'TTS-1 HD (Hohe Qualität)' }
                 ],
                 voices: [
-                    { id: 'alloy', desc: 'Alloy (Neutral & Ausgeglichen)' },
-                    { id: 'echo', desc: 'Echo (Warm & Männlich)' },
-                    { id: 'fable', desc: 'Fable (Britisch & Erzählend)' },
-                    { id: 'onyx', desc: 'Onyx (Tief & Autorität)' },
-                    { id: 'nova', desc: 'Nova (Klar & Weiblich)' },
-                    { id: 'shimmer', desc: 'Shimmer (Sanft & Hell)' }
+                    { id: 'nova', desc: 'Nova (Weiblich | Klar & Energetisch)' },
+                    { id: 'shimmer', desc: 'Shimmer (Weiblich | Sanft & Hell)' },
+                    { id: 'alloy', desc: 'Alloy (Neutral | Ausgeglichen)' },
+                    { id: 'echo', desc: 'Echo (Männlich | Warm)' },
+                    { id: 'fable', desc: 'Fable (Männlich | Britisch & Erzählend)' },
+                    { id: 'onyx', desc: 'Onyx (Männlich | Tief & Autorität)' }
                 ]
             },
             gemini: {
@@ -159,21 +194,44 @@
                     { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash TTS' }
                 ],
                 voices: [
-                    { id: 'Zephyr', desc: 'Zephyr (Sanft & Ruhig)' },
-                    { id: 'Kore', desc: 'Kore (Klar & Freundlich)' },
-                    { id: 'Fenrir', desc: 'Fenrir (Tief & Kräftig)' },
-                    { id: 'Aoede', desc: 'Aoede (Lebhaft & Weiblich)' },
-                    { id: 'Puck', desc: 'Puck (Quirlig & Verspielt)' }
+                    // Weibliche & Neutrale Stimmen
+                    { id: 'Aoede', desc: 'Aoede (Weiblich | Lebhaft)' },
+                    { id: 'Autonoe', desc: 'Autonoe (Weiblich | Klar)' },
+                    { id: 'Callirrhoe', desc: 'Callirrhoe (Weiblich | Weich)' },
+                    { id: 'Despina', desc: 'Despina (Weiblich | Fein)' },
+                    { id: 'Erinome', desc: 'Erinome (Weiblich | Erzählend)' },
+                    { id: 'Kore', desc: 'Kore (Weiblich | Freundlich)' },
+                    { id: 'Laomedeia', desc: 'Laomedeia (Weiblich | Stolz)' },
+                    { id: 'Leda', desc: 'Leda (Weiblich | Hell)' },
+                    { id: 'Puck', desc: 'Puck (Neutral/Hell | Quirlig)' },
+                    { id: 'Zephyr', desc: 'Zephyr (Neutral/Sanft | Ruhig)' },
+                    // Männliche Stimmen
+                    { id: 'Achernar', desc: 'Achernar (Männlich | Kräftig)' },
+                    { id: 'Algenib', desc: 'Algenib (Männlich | Neutral)' },
+                    { id: 'Algieba', desc: 'Algieba (Männlich | Lebendig)' },
+                    { id: 'Charon', desc: 'Charon (Männlich | Markant)' },
+                    { id: 'Enceladus', desc: 'Enceladus (Männlich | Kräftig)' },
+                    { id: 'Fenrir', desc: 'Fenrir (Männlich | Tief)' },
+                    { id: 'Iapetus', desc: 'Iapetus (Männlich | Ruhig)' },
+                    { id: 'Orus', desc: 'Orus (Männlich | Dunkel)' },
+                    { id: 'Rasalgethi', desc: 'Rasalgethi (Männlich | Sehr Tief)' },
+                    { id: 'Umbriel', desc: 'Umbriel (Männlich | Sanft)' }
                 ]
             }
         };
 
         let currentProvider = 'openai';
-        let currentAudioUrl = null; // Um Memory Leaks auf mobilen Geräten zu vermeiden
+        let currentAudioUrl = null; 
 
-        // QoL Feature: Gedächtnis-Rucksack für die App
+        // QoL Feature: Erweiterter Gedächtnis-Rucksack
         const STORAGE_KEY = 'vorleser_ki_prefs';
-        let userPrefs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"provider":"openai", "keys":{"openai":"","gemini":""}}');
+        let userPrefs = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        
+        // Fallbacks, falls der User die App schon mal ohne die neuen Settings geöffnet hatte
+        if (!userPrefs.provider) userPrefs.provider = "openai";
+        if (!userPrefs.keys) userPrefs.keys = { openai: "", gemini: "" };
+        if (userPrefs.speed === undefined) userPrefs.speed = "1.0";
+        if (userPrefs.autoplay === undefined) userPrefs.autoplay = true;
 
         // UI Elemente
         const btnOpenAI = document.getElementById('btnProviderOpenAI');
@@ -189,8 +247,37 @@
         const audioPlayer = document.getElementById('audioPlayer');
         const errorContainer = document.getElementById('errorContainer');
         const errorMessage = document.getElementById('errorMessage');
+        
+        // Neue Einstellungs-Elemente
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const autoPlayToggle = document.getElementById('autoPlayToggle');
 
         // --- Setup UI Status ---
+
+        function updateCharCount() {
+            const count = textInput.value.length;
+            document.getElementById('charCount').textContent = `${count} Zeichen`;
+        }
+
+        function clearText() {
+            textInput.value = '';
+            updateCharCount();
+            textInput.focus();
+        }
+
+        function initSettings() {
+            speedSlider.value = userPrefs.speed;
+            autoPlayToggle.checked = userPrefs.autoplay;
+            updateSpeedLabel();
+        }
+
+        function updateSpeedLabel() {
+            const speed = parseFloat(speedSlider.value).toFixed(1);
+            speedValue.textContent = speed + 'x';
+            // Live-Update, falls gerade etwas abspielt!
+            audioPlayer.playbackRate = parseFloat(speedSlider.value);
+        }
 
         function setProvider(provider) {
             currentProvider = provider;
@@ -206,15 +293,12 @@
                 btnOpenAI.className = "py-2 px-3 rounded-lg text-sm font-medium transition-all text-slate-400 hover:text-slate-200";
             }
 
-            // Input Placeholder aktualisieren
             apiKeyInput.placeholder = apiConfig[provider].placeholder;
             apiKeyInput.value = userPrefs.keys[provider] || '';
 
-            // Dropdowns füllen
             populateSelect(modelSelect, apiConfig[provider].models, 'id', 'name', userPrefs[provider + '_model']);
             populateSelect(voiceSelect, apiConfig[provider].voices, 'id', 'desc', userPrefs[provider + '_voice']);
             
-            // Audio Reset bei Wechsel
             audioContainer.classList.add('hidden');
             if (currentAudioUrl) {
                 URL.revokeObjectURL(currentAudioUrl);
@@ -239,6 +323,8 @@
             userPrefs.keys[currentProvider] = apiKeyInput.value.trim();
             userPrefs[currentProvider + '_model'] = modelSelect.value;
             userPrefs[currentProvider + '_voice'] = voiceSelect.value;
+            userPrefs.speed = speedSlider.value;
+            userPrefs.autoplay = autoPlayToggle.checked;
             localStorage.setItem(STORAGE_KEY, JSON.stringify(userPrefs));
         }
 
@@ -328,9 +414,7 @@
             try {
                 let finalAudioBlob = null;
 
-                // ADAPTER PATTERN: Verzweigung je nach Anbieter
                 if (currentProvider === 'openai') {
-                    // OpenAI Architektur (Gibt fertige MP3 zurück)
                     const response = await fetch('https://api.openai.com/v1/audio/speech', {
                         method: 'POST',
                         headers: {
@@ -352,7 +436,6 @@
                     finalAudioBlob = await response.blob();
 
                 } else if (currentProvider === 'gemini') {
-                    // Gemini Architektur (Gibt base64 PCM zurück, muss zu WAV gebaut werden)
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
                     const payload = {
                         contents: [{ parts: [{ text: text }] }],
@@ -387,13 +470,25 @@
                     finalAudioBlob = createWavFile(pcmData, sampleRate);
                 }
 
-                // Speicher aufräumen und neues Audio laden
                 if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
                 currentAudioUrl = URL.createObjectURL(finalAudioBlob);
                 
                 audioPlayer.src = currentAudioUrl;
+                
+                // Download-Button dynamisch anpassen
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.href = currentAudioUrl;
+                downloadBtn.download = currentProvider === 'openai' ? 'ki-stimme.mp3' : 'ki-stimme.wav';
+                
+                // Geschwindigkeit aus den Settings anwenden
+                audioPlayer.playbackRate = parseFloat(speedSlider.value);
+                
                 audioContainer.classList.remove('hidden');
-                audioPlayer.play().catch(() => console.log("Autoplay blockiert."));
+                
+                // Automatisches Abspielen prüfen
+                if (autoPlayToggle.checked) {
+                    audioPlayer.play().catch(() => console.log("Autoplay wurde vom mobilen Browser blockiert."));
+                }
 
             } catch (error) {
                 console.error("Generierungsfehler:", error);
@@ -403,8 +498,6 @@
             }
         }
 
-        // --- UI Helper ---
-        
         function setLoadingState(isLoading) {
             generateBtn.disabled = isLoading;
             if (isLoading) {
@@ -428,7 +521,8 @@
             errorContainer.classList.add('hidden');
         }
 
-        // Initialisierung
+        // Initiale Ladevorgänge
+        initSettings();
         setProvider(userPrefs.provider || 'openai');
 
     </script>
